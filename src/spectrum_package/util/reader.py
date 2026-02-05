@@ -17,4 +17,13 @@ def read_fits(filename: str) -> tuple[fits.Header, np.ndarray, np.ndarray, np.nd
         image_hdu = cast(fits.ImageHDU, hdul[1])
         error_hdu = cast(fits.ImageHDU, hdul[2])
         quality_hdu = cast(fits.ImageHDU, hdul[3])
+
+        if image_hdu.data is None:
+            raise ValueError("HDU 1 (Image) data is None")
+        if error_hdu.data is None:
+            raise ValueError("HDU 2 (Error) data is None")
+        if quality_hdu.data is None:
+            raise ValueError("HDU 3 (Quality) data is None")
+
+
         return primary_hdu.header, image_hdu.data, error_hdu.data, quality_hdu.data

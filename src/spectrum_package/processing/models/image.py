@@ -3,6 +3,7 @@ from typing import Self
 from ...util.reader import read_fits
 from .header import HeaderRaw
 import matplotlib.pyplot as plt
+from matplotlib.axes import Axes
 import numpy as np
 
 @dataclass(frozen=True)
@@ -15,7 +16,7 @@ class SpectrumBase:
     def __repr__(self) -> str:
         return f"SpectrumBase(data={self.data.shape}, error={self.error.shape}, quality={self.quality.shape}, wavelength={self.wavelength.shape})"
 
-    def plot_spectrum(self,point: int,ax: plt.Axes=None) -> plt.Axes:
+    def plot_spectrum(self, point: int, ax: Axes | None = None) -> Axes:
         if ax is None:
             fig, ax = plt.subplots()
         ax.plot(self.wavelength, self.data[point,:])
