@@ -5,6 +5,7 @@ from .header import HeaderRaw
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 import numpy as np
+from pathlib import Path
 
 @dataclass(frozen=True)
 class SpectrumBase:
@@ -18,8 +19,8 @@ class SpectrumBase:
 
     def plot_spectrum(self, point: int, ax: Axes | None = None) -> Axes:
         if ax is None:
-            fig, ax = plt.subplots()
-        ax.plot(self.wavelength, self.data[point,:])
+            _, ax = plt.subplots()  # type: ignore
+        ax.plot(self.wavelength, self.data[point,:])  # type: ignore
         return ax
 
 @dataclass(frozen=True)
@@ -28,7 +29,7 @@ class ImageModel:
     spectrum: SpectrumBase
 
     @classmethod
-    def load(cls, filename: str) -> Self:
+    def load(cls, filename: Path) -> Self:
         header, data, error, quality = read_fits(filename)
         header = HeaderRaw.parse_header(header)
         return cls(
