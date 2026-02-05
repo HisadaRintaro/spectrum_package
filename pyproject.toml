@@ -1,0 +1,23 @@
+[project]
+name = "spectrum-package"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "HisadaRintaro",email = "rintro204@icloud.com"}
+]
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "ipython (>=9.9.0,<10.0.0)",
+    "astropy (>=7.2.0,<8.0.0)",
+    "matplotlib (>=3.10.8,<4.0.0)",
+    "mayavi (>=4.8.3,<5.0.0)"
+]
+
+[tool.poetry]
+packages = [{include = "spectrum_package", from = "src"}]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
