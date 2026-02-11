@@ -1,9 +1,13 @@
-from .models.header import HeaderRaw
-from .models.instrument import  InstrumentModel
+from .models.instrument import InstrumentModel
 from .models.image import ImageModel
+from .models.header import HeaderProfile
+from .models.spectrum import SpectrumBase
+from .models.velocity import VelocityModel
 
 __all__ = [
-        "HeaderRaw",
         "InstrumentModel",
         "ImageModel",
+        "HeaderProfile",
+        "SpectrumBase",
+        "VelocityModel",
         ]

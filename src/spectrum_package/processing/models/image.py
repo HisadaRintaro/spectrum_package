@@ -1,38 +1,93 @@
+"""スペクトル画像モデル.
+
+FITS ファイルのヘッダー情報とスペクトルデータを統合し、
+スペクトルの描画などの操作を提供する。
+"""
+
 from dataclasses import dataclass
 from typing import Self
-from ...util.reader import read_fits
-from .header import HeaderRaw
+from pathlib import Path
+
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 import numpy as np
-from pathlib import Path
 
-@dataclass(frozen=True)
-class SpectrumBase:
-    data: np.ndarray
-    error: np.ndarray
-    quality: np.ndarray
-    wavelength: np.ndarray    
+from .header import HeaderProfile
+from .spectrum import SpectrumBase
+from ...util.constants import ANGSTROM_TO_METER
 
-    def __repr__(self) -> str:
-        return f"SpectrumBase(data={self.data.shape}, error={self.error.shape}, quality={self.quality.shape}, wavelength={self.wavelength.shape})"
-
-    def plot_spectrum(self, point: int, ax: Axes | None = None) -> Axes:
-        if ax is None:
-            _, ax = plt.subplots()  # type: ignore
-        ax.plot(self.wavelength, self.data[point,:])  # type: ignore
-        return ax
 
 @dataclass(frozen=True)
 class ImageModel:
-    header: HeaderRaw
+    """スペクトル画像の統合モデル.
+
+    ヘッダー情報（WCS、観測メタデータ）とスペクトルデータ（科学データ、
+    誤差、品質フラグ）を一つのモデルとして保持する。
+
+    Attributes
+    ----------
+    header : HeaderProfile
+        FITS ヘッダー情報（Primary + Spectrogram）
+    spectrum : SpectrumBase
+        2次元スペクトルデータ
+    """
+
+    header: HeaderProfile
     spectrum: SpectrumBase
+
+    def __repr__(self) -> str:
+        return f"ImageModel( \n header={self.header}, \n spectrum={self.spectrum} \n )"
 
     @classmethod
     def load(cls, filename: Path) -> Self:
-        header, data, error, quality = read_fits(filename)
-        header = HeaderRaw.parse_header(header)
+        """FITS ファイルからスペクトル画像モデルをロードする.
+
+        Parameters
+        ----------
+        filename : Path
+            FITS ファイルのパス
+
+        Returns
+        -------
+        ImageModel
+            ロードされたスペクトル画像モデル
+        """
         return cls(
-            header=header,
-            spectrum=SpectrumBase(data=data, error=error, quality=quality, wavelength=header.wavelength),
+            header=HeaderProfile.load(filename),
+            spectrum=SpectrumBase.load(filename),
         )
+
+    def plot_spectrum(
+        self,
+        point: int,
+        center_wave: float = 5007,
+        width: float = 10,
+        ax: Axes | None = None,
+    ) -> Axes:
+        """指定した空間位置のスペクトルを描画する.
+
+        Parameters
+        ----------
+        point : int
+            空間方向のピクセルインデックス（data[:, point] を描画）
+        center_wave : float, optional
+            表示中心波長 [Å]（デフォルト: 5007）
+        width : float, optional
+            表示波長幅の半値 [Å]（デフォルト: 10）。
+            表示範囲は center_wave ± width となる。
+        ax : Axes or None, optional
+            描画先の matplotlib Axes。None の場合は新規作成。
+
+        Returns
+        -------
+        Axes
+            スペクトルが描画された Axes オブジェクト
+        """
+        wave = self.header.spectrogram.wavelength_array / ANGSTROM_TO_METER
+        if ax is None:
+            _, ax = plt.subplots()
+        ax.plot(wave, self.spectrum.data[:, point])
+        ax.set_xlim(center_wave - width, center_wave + width)
+        ax.set_xlabel(r"Wavelength [$\AA$]")
+        ax.set_ylabel("Counts")
+        return ax
