@@ -8,6 +8,7 @@ glob パターンによるファイル探索を行う。
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Self
+from spectrum_package.util.fits_reader import STISFitsReader
 
 
 @dataclass(frozen=True)
@@ -96,3 +97,14 @@ class InstrumentModel:
             ]
         path_list.sort()
         return path_list
+
+    @property
+    def reader_list(self) -> list[STISFitsReader]:
+        """現在の設定に基づいてファイルパスの一覧を取得する.
+
+        Returns
+        -------
+        list[Path]
+            パターンに一致するファイルパスのソート済みリスト
+        """
+        return [STISFitsReader.open(p) for p in self.path_list]

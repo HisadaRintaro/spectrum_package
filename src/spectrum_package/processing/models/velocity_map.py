@@ -7,7 +7,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Self
+from typing import Self, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .instrument import InstrumentModel
 
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
@@ -44,7 +47,7 @@ class VelocityMap:
     interpolation_method: str
 
     @classmethod
-    def from_velocity_models(
+    def _from_velocity_models(
         cls,
         models: list[VelocityModel],
         method: str = "linear",
@@ -105,6 +108,56 @@ class VelocityMap:
             x_coords=grid_x,
             y_coords=grid_y,
             interpolation_method=method,
+        )
+
+    @classmethod
+    def from_instrument_model(
+        cls,
+        instrument_model: InstrumentModel,
+        rest_wavelength: float,
+        window_width: float,
+        slit_step: float = 0.2,
+        method: str = "linear",
+        grid_resolution: int | None = None,
+    ) -> Self:
+        """InstrumentModel から VelocityMap を直接生成する.
+
+        Parameters
+        ----------
+        instrument_model : InstrumentModel
+            ファイル探索モデル
+        rest_wavelength : float
+            輝線の静止波長 [m]
+        window_width : float
+            フィッティングウィンドウの半幅 [m]
+        slit_step : float, optional
+            スリット間のオフセットステップ [arcsec]（デフォルト: 0.2）
+        method : str, optional
+            補間メソッド名（"linear", "nearest", "cubic"）。
+            デフォルト: "linear"
+        grid_resolution : int, optional
+            グリッドの解像度（各軸のピクセル数）。
+
+        Returns
+        -------
+        VelocityMap
+            補間された 2D 速度マップ
+        """
+        from .image import ImageModel
+
+        models = []
+        for i, path in enumerate(instrument_model.path_list):
+            image = ImageModel.load(path)
+            model = VelocityModel.from_image(
+                image,
+                rest_wavelength=rest_wavelength,
+                window_width=window_width,
+                slit_offset=i * slit_step,
+            )
+            models.append(model)
+
+        return cls._from_velocity_models(
+            models, method=method, grid_resolution=grid_resolution
         )
 
     def plot(
