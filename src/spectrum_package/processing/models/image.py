@@ -15,6 +15,7 @@ import numpy as np
 from .header import HeaderProfile
 from .spectrum import SpectrumBase
 from ...util.constants import ANGSTROM_TO_METER
+from ...util.fits_reader import STISFitsReader
 
 
 @dataclass(frozen=True)
@@ -42,6 +43,9 @@ class ImageModel:
     def load(cls, filename: Path) -> Self:
         """FITS ファイルからスペクトル画像モデルをロードする.
 
+        内部で STISFitsReader を使い、ファイルを1回だけ開いて
+        ヘッダーとデータを同時に読み込む。
+
         Parameters
         ----------
         filename : Path
@@ -52,9 +56,10 @@ class ImageModel:
         ImageModel
             ロードされたスペクトル画像モデル
         """
+        reader = STISFitsReader.open(filename)
         return cls(
-            header=HeaderProfile.load(filename),
-            spectrum=SpectrumBase.load(filename),
+            header=HeaderProfile.from_reader(reader),
+            spectrum=SpectrumBase.from_reader(reader),
         )
 
     def plot_spectrum(

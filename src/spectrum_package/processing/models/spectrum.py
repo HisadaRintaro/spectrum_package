@@ -4,13 +4,15 @@ STIS FITS ファイルから読み取った2次元スペクトルデータ
 （科学データ・統計的誤差・品質フラグ）を保持する。
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Self
-from pathlib import Path
+from typing import Self, TYPE_CHECKING
 
 import numpy as np
 
-from ...util.reader import read_image
+if TYPE_CHECKING:
+    from ...util.fits_reader import STISFitsReader
 
 
 @dataclass(frozen=True)
@@ -39,18 +41,18 @@ class SpectrumBase:
         return f"SpectrumBase(data={self.data.shape}, error={self.error.shape}, quality={self.quality.shape})"
 
     @classmethod
-    def load(cls, filename: Path) -> Self:
-        """FITS ファイルからスペクトルデータをロードする.
+    def from_reader(cls, reader: STISFitsReader) -> Self:
+        """STISFitsReader からスペクトルデータを生成する.
 
         Parameters
         ----------
-        filename : Path
-            FITS ファイルのパス
+        reader : STISFitsReader
+            読み込み済みの Reader インスタンス
 
         Returns
         -------
         SpectrumBase
             ロードされたスペクトルデータ
         """
-        data, error, quality = read_image(filename)
+        data, error, quality = reader.spectrum_data()
         return cls(data=data, error=error, quality=quality)
