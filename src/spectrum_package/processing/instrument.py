@@ -8,7 +8,7 @@ glob パターンによるファイル探索を行う。
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Self
-from spectrum_package.util.fits_reader import STISFitsReader
+from ..util.fits_reader import STISFitsReader
 
 
 @dataclass(frozen=True)

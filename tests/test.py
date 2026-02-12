@@ -1,9 +1,9 @@
 from spectrum_package.processing import InstrumentModel, ImageModel, VelocityModel, VelocityMap
-from astropy.io import fits
-from astropy.wcs import WCS
+from spectrum_package.util import STISFitsReader
 
 inst = InstrumentModel("HST/", "_flt", ".fits", depth=1,exclude_files=("o56503010_flt.fits",))
-image = ImageModel.load(inst.path_list[0])
+reader = STISFitsReader.open(inst.path_list[0])
+image = ImageModel.from_reader(reader)
 
 # [OIII] 5007Å = 5.007e-7 m
 vel = VelocityModel.from_image(image, rest_wavelength=5.007e-7, window_width=1e-8)

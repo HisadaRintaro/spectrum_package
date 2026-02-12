@@ -14,7 +14,7 @@ from matplotlib.axes import Axes
 import numpy as np
 from scipy.optimize import curve_fit  # type: ignore
 
-from ...util.constants import ANGSTROM_TO_METER, SPEED_OF_LIGHT
+from ..util.constants import ANGSTROM_TO_METER, SPEED_OF_LIGHT
 
 if TYPE_CHECKING:
     from .image import ImageModel

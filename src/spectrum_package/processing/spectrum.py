@@ -12,7 +12,7 @@ from typing import Self, TYPE_CHECKING
 import numpy as np
 
 if TYPE_CHECKING:
-    from ...util.fits_reader import STISFitsReader
+    from ..util.fits_reader import STISFitsReader
 
 
 @dataclass(frozen=True)

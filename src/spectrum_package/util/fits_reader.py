@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Self
+from typing import Self, Iterator
 
 import numpy as np
 from astropy.io import fits  # type: ignore
@@ -137,3 +137,55 @@ class STISFitsReader:
             shape = self.data[i].shape if i in self.data else "No data"
             lines.append(f"  HDU {i}: shape={shape}")
         return "\n".join(lines)
+
+
+@dataclass(frozen=True)
+class ReaderCollection:
+    """複数の STISFitsReader をまとめて管理するコレクション.
+
+    ファイルリストを一括読み込みし、ヘッダー情報の確認や
+    データの探索を効率的に行う。
+
+    Attributes
+    ----------
+    readers : list[STISFitsReader]
+        読み込み済み Reader のリスト
+    """
+
+    readers: list[STISFitsReader]
+
+    @classmethod
+    def from_paths(cls, paths: list[Path]) -> Self:
+        """パスのリストから Reader を一括生成する.
+
+        Parameters
+        ----------
+        paths : list[Path]
+            FITS ファイルパスのリスト
+
+        Returns
+        -------
+        ReaderCollection
+            読み込み済みコレクション
+        """
+        return cls(readers=[STISFitsReader.open(p) for p in paths])
+
+    def __len__(self) -> int:
+        return len(self.readers)
+
+    def __getitem__(self, index: int) -> STISFitsReader:
+        return self.readers[index]
+
+    def __iter__(self) -> Iterator[STISFitsReader]:
+        return iter(self.readers)
+
+    def info(self) -> str:
+        """全ファイルのヘッダー概要を返す.
+
+        Returns
+        -------
+        str
+            各ファイルの HDU 概要を連結した文字列
+        """
+        return "\n\n".join(reader.info() for reader in self.readers)
+

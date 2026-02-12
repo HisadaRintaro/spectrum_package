@@ -17,7 +17,7 @@ from matplotlib.axes import Axes
 import numpy as np
 
 from .velocity import VelocityModel
-from ...util.interpolation import Interpolator, get_interpolator
+from ..util.interpolation import Interpolator, get_interpolator
 
 
 @dataclass(frozen=True)
@@ -143,18 +143,20 @@ class VelocityMap:
         VelocityMap
             補間された 2D 速度マップ
         """
-        from .image import ImageModel
+        from .image import ImageCollection
+        from ..util.fits_reader import ReaderCollection
 
-        models = []
-        for i, path in enumerate(instrument_model.path_list):
-            image = ImageModel.load(path)
-            model = VelocityModel.from_image(
+        reader_collection = ReaderCollection.from_paths(instrument_model.path_list)
+        image_collection = ImageCollection.from_readers(reader_collection)
+        models = [
+            VelocityModel.from_image(
                 image,
                 rest_wavelength=rest_wavelength,
                 window_width=window_width,
                 slit_offset=i * slit_step,
             )
-            models.append(model)
+            for i, image in enumerate(image_collection)
+        ]
 
         return cls._from_velocity_models(
             models, method=method, grid_resolution=grid_resolution

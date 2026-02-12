@@ -16,7 +16,7 @@ from astropy.wcs import WCS  # type: ignore
 import numpy as np
 
 if TYPE_CHECKING:
-    from ...util.fits_reader import STISFitsReader
+    from ..util.fits_reader import STISFitsReader
 
 
 @dataclass(frozen=True)
