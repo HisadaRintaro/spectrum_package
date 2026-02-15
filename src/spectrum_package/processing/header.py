@@ -5,20 +5,25 @@ Primary HDU（HDU 0）と Spectrogram HDU（HDU 1）のメタデータを
 それぞれ専用クラスで保持し、`HeaderProfile` で集約する。
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
+from typing import Self, cast, Any, TYPE_CHECKING
+from pathlib import Path
+
 from astropy.io import fits  # type: ignore
 from astropy.wcs import WCS  # type: ignore
-from typing import Self, cast, Any
-from pathlib import Path
-from ...util.reader import read_header
 import numpy as np
+
+if TYPE_CHECKING:
+    from ..util.fits_reader import STISFitsReader
 
 
 @dataclass(frozen=True)
 class HeaderSpectrogram:
     """スペクトログラム HDU（HDU 1）のヘッダー情報.
 
-    WCS 情報を用いて波長配列への変換機能を提供する。
+    WCS 情報を用いて波長配列および空間座標配列への変換機能を提供する。
 
     Attributes
     ----------
@@ -86,6 +91,25 @@ class HeaderSpectrogram:
         spec_wcs = self.wcs.sub(["spectral"])  # type: ignore
         return spec_wcs.pixel_to_world_values(pixel_indices)  # type: ignore
 
+    @property
+    def spatial_array(self) -> np.ndarray:
+        """空間方向のピクセルインデックス配列を返す.
+
+        空間軸のピクセル数に基づいた 0 始まりのインデックス配列を返す。
+        実際の物理座標（arcsec 等）への変換はスリット間隔の情報と
+        組み合わせて行う。
+
+        Returns
+        -------
+        np.ndarray
+            空間方向のピクセルインデックス配列 (0, 1, 2, ...)
+        """
+        if self.wcs.wcs.ctype[0] == "WAVE":  # type: ignore
+            n_spatial = self.shape[0]
+        else:
+            n_spatial = self.shape[1]
+        return np.arange(n_spatial)
+
 
 @dataclass(frozen=True)
 class HeaderPrimary:
@@ -150,13 +174,13 @@ class HeaderProfile:
         return f"HeaderProfile(primary={self.primary.__class__.__name__}, spectrogram={self.spectrogram.__class__.__name__})"
 
     @classmethod
-    def load(cls, filename: Path) -> Self:
-        """FITS ファイルからヘッダー情報をロードする.
+    def from_reader(cls, reader: STISFitsReader) -> Self:
+        """STISFitsReader からヘッダー情報を生成する.
 
         Parameters
         ----------
-        filename : Path
-            FITS ファイルのパス
+        reader : STISFitsReader
+            読み込み済みの Reader インスタンス
 
         Returns
         -------
@@ -164,6 +188,6 @@ class HeaderProfile:
             ロードされたヘッダー情報
         """
         return cls(
-            primary=HeaderPrimary.parse_header(read_header(filename, 0)),
-            spectrogram=HeaderSpectrogram.parse_header(read_header(filename, 1)),
+            primary=HeaderPrimary.parse_header(reader.header(0)),
+            spectrogram=HeaderSpectrogram.parse_header(reader.header(1)),
         )

@@ -8,6 +8,7 @@ glob パターンによるファイル探索を行う。
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Self
+from ..util.fits_reader import STISFitsReader
 
 
 @dataclass(frozen=True)
@@ -27,15 +28,27 @@ class InstrumentModel:
         ファイルの拡張子（例: ".fits"）
     depth : int
         ディレクトリ探索の深度（デフォルト: 1）
+    exclude_files : tuple[str, ...]
+        除外するファイル名のタプル。
+        ファイルのステム名（拡張子なし）またはフルネーム（拡張子あり）で
+        マッチしたファイルをリストから除外する。（デフォルト: ()）
     """
 
     file_directory: str
     suffix: str
     extension: str
     depth: int = 1
+    exclude_files: tuple[str, ...] = ()
 
     @classmethod
-    def load(cls, file_directory: str, suffix: str = "", extension: str = "", depth: int = 1) -> Self:
+    def load(
+        cls,
+        file_directory: str,
+        suffix: str = "",
+        extension: str = "",
+        depth: int = 1,
+        exclude_files: tuple[str, ...] = (),
+    ) -> Self:
         """InstrumentModel を生成する.
 
         Parameters
@@ -48,6 +61,8 @@ class InstrumentModel:
             ファイルの拡張子（デフォルト: ""）
         depth : int, optional
             ディレクトリ探索の深度（デフォルト: 1）
+        exclude_files : tuple[str, ...], optional
+            除外するファイル名のタプル（デフォルト: ()）
 
         Returns
         -------
@@ -59,34 +74,10 @@ class InstrumentModel:
             suffix=suffix,
             extension=extension,
             depth=depth,
+            exclude_files=exclude_files,
         )
 
-    @staticmethod
-    def get_path_list(file_directory: str, suffix: str, extension: str, depth: int = 1) -> list[Path]:
-        """指定条件に一致するファイルパスの一覧を取得する.
-
-        Parameters
-        ----------
-        file_directory : str
-            データファイルのルートディレクトリパス
-        suffix : str
-            ファイル名の接尾辞
-        extension : str
-            ファイルの拡張子
-        depth : int, optional
-            ディレクトリ探索の深度（デフォルト: 1）
-
-        Returns
-        -------
-        list[Path]
-            パターンに一致するファイルパスのソート済みリスト
-        """
-        path = Path(file_directory)
-        pattern = "*/" * depth + f"*{suffix}{extension}"
-        path_list = list(path.glob(pattern))
-        path_list.sort()
-        return path_list
-
+    @property
     def path_list(self) -> list[Path]:
         """現在の設定に基づいてファイルパスの一覧を取得する.
 
@@ -95,9 +86,25 @@ class InstrumentModel:
         list[Path]
             パターンに一致するファイルパスのソート済みリスト
         """
-        return self.get_path_list(
-            file_directory=self.file_directory,
-            suffix=self.suffix,
-            extension=self.extension,
-            depth=self.depth,
-        )
+        path = Path(self.file_directory)
+        pattern = "*/" * self.depth + f"*{self.suffix}{self.extension}"
+        path_list = list(path.glob(pattern))
+        if self.exclude_files:
+            exclude_set = set(self.exclude_files)
+            path_list = [
+                p for p in path_list
+                if p.stem not in exclude_set and p.name not in exclude_set
+            ]
+        path_list.sort()
+        return path_list
+
+    @property
+    def reader_list(self) -> list[STISFitsReader]:
+        """現在の設定に基づいてファイルパスの一覧を取得する.
+
+        Returns
+        -------
+        list[Path]
+            パターンに一致するファイルパスのソート済みリスト
+        """
+        return [STISFitsReader.open(p) for p in self.path_list]

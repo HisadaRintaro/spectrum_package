@@ -4,9 +4,11 @@ FITS ファイルのヘッダー情報とスペクトルデータを統合し、
 スペクトルの描画などの操作を提供する。
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Self
-from pathlib import Path
+from typing import Self, Iterator, TYPE_CHECKING
+
 
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
@@ -14,7 +16,8 @@ import numpy as np
 
 from .header import HeaderProfile
 from .spectrum import SpectrumBase
-from ...util.constants import ANGSTROM_TO_METER
+from ..util.constants import ANGSTROM_TO_METER
+from ..util.fits_reader import STISFitsReader, ReaderCollection
 
 
 @dataclass(frozen=True)
@@ -39,22 +42,22 @@ class ImageModel:
         return f"ImageModel( \n header={self.header}, \n spectrum={self.spectrum} \n )"
 
     @classmethod
-    def load(cls, filename: Path) -> Self:
-        """FITS ファイルからスペクトル画像モデルをロードする.
+    def from_reader(cls, reader: STISFitsReader) -> Self:
+        """STISFitsReader からスペクトル画像モデルを生成する.
 
         Parameters
         ----------
-        filename : Path
-            FITS ファイルのパス
+        reader : STISFitsReader
+            読み込み済みの Reader インスタンス
 
         Returns
         -------
         ImageModel
-            ロードされたスペクトル画像モデル
+            生成されたスペクトル画像モデル
         """
         return cls(
-            header=HeaderProfile.load(filename),
-            spectrum=SpectrumBase.load(filename),
+            header=HeaderProfile.from_reader(reader),
+            spectrum=SpectrumBase.from_reader(reader),
         )
 
     def plot_spectrum(
@@ -91,3 +94,45 @@ class ImageModel:
         ax.set_xlabel(r"Wavelength [$\AA$]")
         ax.set_ylabel("Counts")
         return ax
+
+
+@dataclass(frozen=True)
+class ImageCollection:
+    """複数の ImageModel をまとめて管理するコレクション.
+
+    ReaderCollection から一括で生成し、解析パイプラインへ渡す。
+
+    Attributes
+    ----------
+    images : list[ImageModel]
+        ロード済み ImageModel のリスト
+    """
+
+    images: list[ImageModel]
+
+    @classmethod
+    def from_readers(cls, reader_collection: ReaderCollection) -> Self:
+        """ReaderCollection から全ファイルの ImageModel を一括生成する.
+
+        Parameters
+        ----------
+        reader_collection : ReaderCollection
+            読み込み済み Reader コレクション
+
+        Returns
+        -------
+        ImageCollection
+            生成済みコレクション
+        """
+        return cls(
+            images=[ImageModel.from_reader(r) for r in reader_collection]
+        )
+
+    def __len__(self) -> int:
+        return len(self.images)
+
+    def __getitem__(self, index: int) -> ImageModel:
+        return self.images[index]
+
+    def __iter__(self) -> Iterator[ImageModel]:
+        return iter(self.images)
