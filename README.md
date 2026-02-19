@@ -19,7 +19,7 @@
   - (未実装 - 今後 `ImageModel` 等の単一スリットクラスに統合予定)
 - [ ] **removed data**
   - (未実装 - 宇宙線除去・エラー除去処理)
-- [/] **extracted data**
+- [ ] **extracted data**
   - `VelocityModel` (部分的に実装済みだが、Image data との統合クラスへ移行予定)
 - [ ] **3D data Cube**
   - `VelocityMap` (部分的に実装済みだが、全スリットをまとめる3Dクラスへ移行予定)
