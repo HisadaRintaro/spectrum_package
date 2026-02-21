@@ -12,7 +12,8 @@ dependencies = [
     "astropy (>=7.2.0,<8.0.0)",
     "matplotlib (>=3.10.8,<4.0.0)",
     "mayavi (>=4.8.3,<5.0.0)",
-    "scipy (>=1.17.0,<2.0.0)"
+    "scipy (>=1.17.0,<2.0.0)",
+    "stistools (>=1.4.7,<2.0.0)"
 ]
 
 [tool.poetry]
