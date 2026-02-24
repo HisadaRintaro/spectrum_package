@@ -4,18 +4,11 @@ STIS スペクトルデータの解析に使用するモデルクラスを提供
 """
 
 from .instrument import InstrumentModel
-from .image import ImageModel, ImageCollection
-from .header import HeaderProfile
-from .spectrum import SpectrumBase
-from .velocity import VelocityModel
-from .velocity_map import VelocityMap
+from .image import ImageUnit, ImageModel, ImageCollection
 
 __all__ = [
     "InstrumentModel",
+    "ImageUnit",
     "ImageModel",
     "ImageCollection",
-    "HeaderProfile",
-    "SpectrumBase",
-    "VelocityModel",
-    "VelocityMap",
 ]

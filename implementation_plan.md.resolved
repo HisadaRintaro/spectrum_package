@@ -1,0 +1,198 @@
+# ImageModel リファクタリング計画
+
+## 目的
+
+現在の [HeaderProfile](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/header.py#156-194) / [HeaderPrimary](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/header.py#114-154) / [HeaderSpectrogram](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/header.py#22-112) / [SpectrumBase](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/spectrum.py#18-59) という入れ物クラス群を廃棄し、  
+`la-cosmic` プロジェクト ([stis_la-cosmic/src/stis_la_cosmic/image.py](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/la-cosmic/stis_la-cosmic/src/stis_la_cosmic/image.py)) を参考に  
+**[ImageUnit](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/la-cosmic/stis_la-cosmic/src/stis_la_cosmic/image.py#18-45) → [ImageModel](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/image.py#23-97) → [ImageCollection](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/image.py#99-139)** の 3 層構造へ再編する。
+
+---
+
+## 現状の問題点
+
+| 問題 | 詳細 |
+|---|---|
+| [HeaderProfile](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/header.py#156-194) / [SpectrumBase](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/spectrum.py#18-59) が薄いラッパー | ほぼ属性を持ち運ぶだけで、ロジックがほとんどない |
+| [SpectrumBase](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/spectrum.py#18-59) 単体で `wave_array` が取れない | 波長情報は [HeaderSpectrogram](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/header.py#22-112) に閉じており不自然 |
+| FITS 書き出し時に header/data が分離 | 将来の [write_fits](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/la-cosmic/stis_la-cosmic/src/stis_la_cosmic/image.py#605-643) 実装で困難になる |
+| 二重ネスト参照 | `image.header.spectrogram.wavelength_array` のように深くなる |
+
+---
+
+## 競合・影響分析（変更前の現状確認）
+
+> [!IMPORTANT]
+> 以下のコード箇所が、廃棄クラスを **直接参照** しているため、すべて変更が必要になる。
+
+### [processing/velocity.py](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/velocity.py)（影響大）
+
+```python
+# L214: ImageModel.header.spectrogram を使用
+wavelengths = image.header.spectrogram.wavelength_array
+
+# L215-216: ImageModel.spectrum を使用  
+data = image.spectrum.data
+n_spatial = data.shape[1]
+
+# L232: ImageModel.header.spectrogram を使用
+spatial_pixels = image.header.spectrogram.spatial_array
+```
+
+→ リファクタリング後は `image.wavelength_array`（プロパティ）と `image.sci.data` に変更。
+
+### [processing/image.py](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/image.py)（全面書き換え対象）
+
+```python
+from .header import HeaderProfile       # → 廃棄
+from .spectrum import SpectrumBase      # → 廃棄
+
+class ImageModel:
+    header: HeaderProfile               # → primary_header / sci(ImageUnit)
+    spectrum: SpectrumBase              # → sci, err, dq に分解
+
+# plot_spectrum 内
+wave = self.header.spectrogram.wavelength_array  # → self.wavelength_array
+self.spectrum.data[:, point]                      # → self.sci.data[:, point]
+```
+
+### [processing/__init__.py](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/__init__.py)（エクスポート整理が必要）
+
+```python
+from .header import HeaderProfile   # → 削除
+from .spectrum import SpectrumBase  # → 削除
+```
+
+`__all__` からも [HeaderProfile](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/header.py#156-194), [SpectrumBase](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/spectrum.py#18-59) を削除する。
+
+### [tests/test.py](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/tests/test.py)
+
+```python
+image_collection = ImageCollection.from_readers(reader_collection)
+```
+
+現在の [from_readers](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/image.py#113-130) シグネチャと互換性があるので **変更不要**。  
+ただし [ImageModel](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/image.py#23-97) の内部 API が変わるため、`VelocityModel.from_image` 経由で間接的に影響あり。
+
+---
+
+## 廃棄クラス一覧
+
+| クラス | ファイル | 処理 |
+|---|---|---|
+| [HeaderPrimary](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/header.py#114-154) | [header.py](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/header.py) | 廃棄（属性は `ImageModel.primary_header` に吸収） |
+| [HeaderProfile](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/header.py#156-194) | [header.py](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/header.py) | 廃棄（[from_reader](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/spectrum.py#43-59) ロジックは `ImageModel.from_reader` に統合） |
+| [HeaderSpectrogram](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/header.py#22-112) | [header.py](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/header.py) | 廃棄（[wavelength_array](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/header.py#67-93) / [spatial_array](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/header.py#94-112) は [ImageModel](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/image.py#23-97) プロパティへ） |
+| [SpectrumBase](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/spectrum.py#18-59) | [spectrum.py](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/spectrum.py) | 廃棄（`data/error/quality` は `sci/err/dq: ImageUnit` に分解） |
+
+---
+
+## 提案変更内容
+
+### [processing/image.py](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/image.py) ← 全面書き換え
+
+#### 新 [ImageUnit](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/la-cosmic/stis_la-cosmic/src/stis_la_cosmic/image.py#18-45)
+
+```python
+@dataclass(frozen=True)
+class ImageUnit:
+    data: np.ndarray
+    header: fits.Header
+
+    def to_hdu(self) -> fits.ImageHDU: ...
+```
+
+#### 新 [ImageModel](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/image.py#23-97)
+
+```python
+@dataclass(frozen=True)
+class ImageModel:
+    primary_header: fits.Header
+    sci: ImageUnit               # HDU 1 (科学データ)
+    err: ImageUnit | None        # HDU 2 (誤差)
+    dq:  ImageUnit | None        # HDU 3 (品質フラグ)
+
+    @classmethod
+    def from_reader(cls, reader: STISFitsReader) -> Self: ...
+
+    @property
+    def wavelength_array(self) -> np.ndarray:
+        """WCS から波長配列を計算する [m]"""
+        ...  # HeaderSpectrogram.wavelength_array のロジックを移植
+
+    @property
+    def spatial_array(self) -> np.ndarray:
+        """空間方向のピクセルインデックス配列"""
+        ...  # HeaderSpectrogram.spatial_array のロジックを移植
+
+    @property
+    def shape(self) -> tuple[int, int]:
+        return self.sci.data.shape
+
+    def plot_spectrum(self, point, center_wave, width, ax) -> Axes: ...
+```
+
+> [!NOTE]
+> [wavelength_array](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/header.py#67-93) の計算には `sci.header` の WCS 情報を使用する。  
+> (現 `HeaderSpectrogram.wcs` → `WCS(sci.header)` に相当)
+
+#### [ImageCollection](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/image.py#99-139) は内部実装のみ変更
+
+シグネチャ（[from_readers](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/image.py#113-130)・[__iter__](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/image.py#137-139)・[__getitem__](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/la-cosmic/stis_la-cosmic/src/stis_la_cosmic/image.py#746-748)・[__len__](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/la-cosmic/stis_la-cosmic/src/stis_la_cosmic/image.py#743-745)）は変えないため、  
+**[tests/test.py](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/tests/test.py) と [velocity_map.py](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/velocity_map.py) は変更不要**。
+
+---
+
+### [processing/velocity.py](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/velocity.py) / [processing/velocity_map.py](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/velocity_map.py) ← **変更しない**
+
+データフローが大幅に変わるため、[VelocityModel](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/velocity.py#143-319) / [VelocityMap](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/velocity_map.py#24-257) は今後しばらく使用しない。  
+コードはそのまま残すが、[__init__.py](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/util/__init__.py) の公開 API からのみ除外する。
+
+> [!NOTE]
+> これらのファイルは旧 [ImageModel](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/image.py#23-97) の API（`.header.spectrogram.*`, `.spectrum.data`）を参照したままになるが、使用しないため今は修正しない。
+
+### [processing/__init__.py](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/__init__.py) ← エクスポート整理
+
+```diff
+- from .header import HeaderProfile
+- from .spectrum import SpectrumBase
+- from .velocity import VelocityModel
+- from .velocity_map import VelocityMap
++ from .image import ImageUnit
+
+  __all__ = [
+      "InstrumentModel",
++     "ImageUnit",
+      "ImageModel",
+      "ImageCollection",
+-     "HeaderProfile",
+-     "SpectrumBase",
+-     "VelocityModel",
+-     "VelocityMap",
+  ]
+```
+
+[velocity.py](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/velocity.py) / [velocity_map.py](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/velocity_map.py) のファイル自体は残す（削除しない）。
+
+### [processing/header.py](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/header.py) ← 全削除
+
+### [processing/spectrum.py](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/spectrum.py) ← 全削除
+
+---
+
+## Verification Plan
+
+### 既存テスト確認
+
+現在 [tests/test.py](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/tests/test.py) は以下を実行しており、これが通れば基本動作は確認できる：
+
+```bash
+cd /Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package
+python tests/test.py
+```
+
+### 手動確認項目
+
+1. `ImageCollection.from_readers(reader_collection)` が正常に動作すること
+2. `VelocityModel.from_image(image_collection[0], ...)` が [wavelength_array](file:///Users/r.hisada/astroresearchs/ThreeDimensinalStructure/STIS_imaging_spectrograph/spectrum_package/src/spectrum_package/processing/header.py#67-93) / `sci.data` に正しくアクセスできること
+3. `image.wavelength_array` が以前の `image.header.spectrogram.wavelength_array` と同じ値を返すこと
+4. `image.sci.data` が以前の `image.spectrum.data` と同じ値を返すこと

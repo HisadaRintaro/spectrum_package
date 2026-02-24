@@ -8,12 +8,10 @@ authors = [
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "ipython (>=9.9.0,<10.0.0)",
     "astropy (>=7.2.0,<8.0.0)",
     "matplotlib (>=3.10.8,<4.0.0)",
-    "mayavi (>=4.8.3,<5.0.0)",
     "scipy (>=1.17.0,<2.0.0)",
-    "stistools (>=1.4.7,<2.0.0)"
+    "stistools (>=1.4.7,<2.0.0)",
 ]
 
 [tool.poetry]
@@ -23,3 +21,9 @@ packages = [{include = "spectrum_package", from = "src"}]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
 
+[dependency-groups]
+dev = [
+    "pytest (>=9.0.2,<10.0.0)",
+    "ipython (>=9.10.0,<10.0.0)",
+    "pyright (>=1.1.408,<2.0.0)"
+]

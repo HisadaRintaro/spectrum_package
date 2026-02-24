@@ -1,4 +1,6 @@
-from spectrum_package.processing import InstrumentModel, ImageCollection, VelocityModel, VelocityMap
+from spectrum_package.processing import InstrumentModel, ImageCollection
+from spectrum_package.processing.velocity import VelocityModel
+from spectrum_package.processing.velocity_map import VelocityMap
 from spectrum_package.util import ReaderCollection
 
 inst = InstrumentModel("HST/", "_flt", ".fits", depth=1,exclude_files=("o56503010_flt.fits",))

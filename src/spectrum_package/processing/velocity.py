@@ -211,8 +211,8 @@ class VelocityModel:
         VelocityModel
             後退速度モデル
         """
-        wavelengths = image.header.spectrogram.wavelength_array
-        data = image.spectrum.data
+        wavelengths = image.wavelength_array
+        data = image.sci.data
         n_spatial = data.shape[1]
 
         observed = np.full(n_spatial, np.nan)
@@ -229,7 +229,7 @@ class VelocityModel:
         redshifts = (observed - rest_wavelength) / rest_wavelength
         velocities = SPEED_OF_LIGHT * redshifts
 
-        spatial_pixels = image.header.spectrogram.spatial_array
+        spatial_pixels = image.spatial_array
         spatial_positions = spatial_pixels * pixel_scale
 
         return cls(
@@ -272,8 +272,8 @@ class VelocityModel:
         Axes
             診断プロットが描画された Axes オブジェクト
         """
-        wavelengths = image.header.spectrogram.wavelength_array
-        flux = image.spectrum.data[:, spatial_pixel]
+        wavelengths = image.wavelength_array
+        flux = image.sci.data[:, spatial_pixel]
 
         popt, wave_window, flux_window = _fit_gaussian(
             wavelengths, flux, rest_wavelength, window_width
